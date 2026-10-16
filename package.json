@@ -1,8 +1,8 @@
 {
   "name": "ts-playground",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "type": "module",
   "scripts": {
     "dev": "tsx watch",
     "build": "tsc",
@@ -10,15 +10,14 @@
     "test": "vitest",
     "test:run": "vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "devDependencies": {
     "@types/node": "24.13.6",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vite": "8.3.0",
     "vitest": "5.0.1"
+  },
+  "dependencies": {
+    "dayjs": "1.11.23"
   }
 }
