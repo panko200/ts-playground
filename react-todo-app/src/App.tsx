@@ -1,122 +1,247 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect } from "react";
+import type { Todo } from "./types";
+import { initTodos } from "./initTodos";
+import WelcomeMessage from "./WelcomeMessage";
+import TodoList from "./TodoList";
+import { v4 as uuid } from "uuid";
+import { twMerge } from "tailwind-merge";
+import type { ChangeEvent } from "react";
+import dayjs from "dayjs";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 
-function App() {
-  const [count, setCount] = useState(0)
+//チュートリアル終了時
+
+const localStorageKey = "TodoApp";
+
+type StoredTodo = {
+  id: string;
+  name: string;
+  isDone: boolean;
+  priority: number;
+  deadline: string | null;
+};
+
+const loadTodos = (): Todo[] => {
+  const todoJsonStr = localStorage.getItem(localStorageKey);
+  if (todoJsonStr === null) {
+    return initTodos;
+  }
+
+  const storedTodos: StoredTodo[] = JSON.parse(todoJsonStr);
+  return storedTodos.map((todo) => ({
+    ...todo,
+    deadline: todo.deadline === null ? null : new Date(todo.deadline),
+  }));
+};
+
+const App = () => {
+  const [todos, setTodos] = useState<Todo[]>(loadTodos);
+
+  const [newTodoName, setNewTodoName] = useState("");
+
+  const [newTodoPriority, setNewTodoPriority] = useState(3);
+
+  const [newTodoDeadline, setNewTodoDeadline] = useState<Date | null>(null);
+
+  const uncompletedCount = todos.filter((todo) => !todo.isDone).length;
+
+  const [isNameTouched, setIsNameTouched] = useState(false);
+
+  const getTodoNameError = (name: string): string => {
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2 || trimmedName.length > 32) {
+      return "前後の空白を除いて、2文字以上、32文字以内で入力してください";
+    }
+    return "";
+  };
+
+  useEffect(() => {
+    localStorage.setItem(localStorageKey, JSON.stringify(todos));
+  }, [todos]);
+
+  const newTodoNameError = getTodoNameError(newTodoName);
+  const isNewTodoNameInvalid = newTodoNameError !== "";
+  const showNewTodoNameError = isNameTouched && isNewTodoNameInvalid;
+  const completedCount = todos.length - uncompletedCount;
+
+
+  const updateNewTodoName = (e: ChangeEvent<HTMLInputElement>) => {
+    setNewTodoName(e.target.value);
+    setIsNameTouched(true);
+  };
+
+  const updateNewTodoPriority = (e: ChangeEvent<HTMLInputElement>) => {
+    setNewTodoPriority(Number(e.target.value));
+  };
+  
+  const updateDeadline = (e: ChangeEvent<HTMLInputElement>) => {
+    const dt = e.target.value;
+    setNewTodoDeadline(dt === "" ? null : new Date(dt));
+  };
+
+  const removeCompletedTodos = () => {
+    setTodos((currentTodos) => currentTodos.filter((todo) => !todo.isDone));
+  };
+
+  const remove = (id: string) => {
+    setTodos((currentTodos) => currentTodos.filter((todo) => todo.id !== id));
+  };
+
+  const addNewTodo = () => {
+    if (isNewTodoNameInvalid) {
+      setIsNameTouched(true);
+      return;
+    }
+
+  const newTodo: Todo = {
+      id: uuid(),
+      name: newTodoName.trim(),
+      isDone: false,
+      priority: newTodoPriority,
+      deadline: newTodoDeadline,
+    };
+    setTodos((currentTodos) => [...currentTodos, newTodo]);
+    setNewTodoName("");
+    setNewTodoPriority(3);
+    setNewTodoDeadline(null);
+    setIsNameTouched(false);
+  };
+
+  const updateIsDone = (id: string, value: boolean) => {
+    setTodos((currentTodos) =>
+      currentTodos.map((todo) => {
+        if (todo.id === id) {
+          return { ...todo, isDone: value };
+        } else {
+          return todo;
+        }
+      }),
+    );
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="mx-4 mt-10 max-w-2xl md:mx-auto">
+      <h1 className="mb-4 text-2xl font-bold">TodoApp</h1>
+      <div className="mb-4">
+        <WelcomeMessage
+          name="寝屋川タヌキ"
+          uncompletedCount={uncompletedCount}
+        />
+      </div>
+      <TodoList todos={todos} updateIsDone={updateIsDone} remove={remove} />
+      <button
+        type="button"
+        onClick={removeCompletedTodos}
+        disabled={completedCount === 0}
+        className={twMerge(
+          "mt-4 cursor-pointer rounded-md px-3 py-1 font-medium",
+          "bg-rose-500 text-white hover:bg-rose-600",
+          "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-rose-500",
+        )}
+      >
+        完了済みのタスクを削除
+      </button>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          addNewTodo();
+        }}
+        aria-labelledby="newTodoHeading"
+        className="mt-4 space-y-2 rounded-md border border-slate-300 bg-white p-3 drop-shadow"
+      >
+        <h2 id="newTodoHeading" className="text-lg font-bold">
+          新しいタスクの追加
+        </h2>
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+          <div className="flex items-center space-x-2">
+            <label className="font-bold" htmlFor="newTodoName">
+              名前
+            </label>
+            <input
+              id="newTodoName"
+              name="todoName"
+              type="text"
+              required
+              value={newTodoName}
+              onChange={updateNewTodoName}
+              aria-invalid={showNewTodoNameError}
+              aria-describedby={
+                showNewTodoNameError ? "newTodoNameError" : undefined
+              }
+              className={twMerge(
+                "min-w-0 grow rounded-md border border-gray-300 p-2",
+                showNewTodoNameError && "border-red-500 outline-red-500",
+              )}
+              placeholder="2文字以上、32文字以内で入力してください"
+            />
+          </div>
+          {showNewTodoNameError && (
+            <div
+              id="newTodoNameError"
+              aria-live="polite"
+              className="ml-10 flex items-center space-x-1 text-sm font-medium text-red-500"
+            >
+              <FontAwesomeIcon
+                icon={faTriangleExclamation}
+                className="mr-0.5"
+              />
+              <div>{newTodoNameError}</div>
+            </div>
+          )}
         </div>
+
+        <fieldset>
+          <legend className="mb-1 font-bold">優先度</legend>
+          <div className="flex gap-5">
+            {[1, 2, 3].map((value) => (
+              <label key={value} className="flex items-center space-x-1">
+                <input
+                  id={`priority-${value}`}
+                  name="priorityGroup"
+                  type="radio"
+                  value={value}
+                  checked={newTodoPriority === value}
+                  onChange={updateNewTodoPriority}
+                />
+                <span>{value}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="font-bold" htmlFor="deadline">
+            期限
+          </label>
+          <input
+            type="datetime-local"
+            id="deadline"
+            name="deadline"
+            value={
+              newTodoDeadline
+                ? dayjs(newTodoDeadline).format("YYYY-MM-DDTHH:mm:ss")
+                : ""
+            }
+            onChange={updateDeadline}
+            className="max-w-full min-w-0 rounded-md border border-gray-300 px-2 py-0.5"
+          />
+        </div>
+
         <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+          type="submit"
+          disabled={isNewTodoNameInvalid}
+          className={twMerge(
+            "cursor-pointer rounded-md px-3 py-1",
+            "bg-indigo-500 font-bold text-white hover:bg-indigo-600",
+            "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-indigo-500",
+          )}
         >
-          Count is {count}
+          追加
         </button>
-      </section>
+      </form>
+    </div>
+  );
+};
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
-
-export default App
+export default App;
